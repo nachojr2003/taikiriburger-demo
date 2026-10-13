@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="es-PE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#000000">
+<title>WhatsApp | Taikiri Burger, simulador de la demo</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;1,800;1,900&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   Simulador de WhatsApp: demo Taikiri Burger (restaurante, Collique, Lima).
+   Autocontenido: HTML + CSS + JS vanilla, sin librerías ni CDN de scripts.
+
+   Perspectiva: esta pantalla es el TELÉFONO DEL CLIENTE conversando con
+   "Taikiri Burger".
+     dir:'in'  = el cliente escribe  -> burbuja VERDE a la derecha
+     dir:'out' = el negocio responde -> burbuja GRIS a la izquierda
+   Los mensajes `auto:true` son textos fijos de la casa (saludo y carta), no del agente.
+
+   Backend:  POST {webhook}/taikiriburger-demo-agent
+             { message, sessionId, channel:'web', telefono }  ->  { output }
+   Parámetros: ?mock=1 guion local sin IA (plan B) · ?ensayo=1 sesión con prefijo
+   `ensayo_` (no aparece en el panel) · ?escenario=a|b|c · ?api= (solo en localhost).
+   ========================================================================== */
+:root{
+  --negro:#000; --carbon:#0B0B0B; --panel:#121212; --panel-2:#1A1A1A; --linea:#2A2A2A;
+  --amarillo:#FFCC00; --dorado:#E4A724; --blanco:#F6F3EA; --gris:#B9B5AB; --tinta:#0B0B0B;
+  --wa-fondo:#0b141a; --wa-header:#1f2c34; --wa-in:#202c33; --wa-out:#005c4b; --wa-texto:#e9edef;
+  --wa-meta:#8696a0; --wa-tick:#53bdeb; --wa-caja:#2a3942; --wa-verde:#00a884;
+  --display:'Barlow Condensed','Arial Narrow',Impact,sans-serif;
+  --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--negro);color:var(--blanco);font-family:var(--sans);font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;min-height:100dvh;display:flex;flex-direction:column}
+img{max-width:100%;height:auto;display:block}
+p,h1,h2,h3{margin:0}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none !important}
+a{color:var(--amarillo)}
+:focus-visible{outline:3px solid var(--amarillo);outline-offset:2px;border-radius:6px}
+
+/* ---------- barra superior ---------- */
+.aviso{background:var(--amarillo);color:var(--tinta);padding:7px 16px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;text-align:center}
+.top{background:var(--carbon);border-bottom:1px solid var(--linea);flex:none}
+.top-in{max-width:1180px;margin:0 auto;padding:6px 16px;display:flex;align-items:center;gap:12px}
+.top-in .logo{height:46px;width:auto;flex:none}
+.top-in .quien b{display:block;font-family:var(--display);font-style:italic;font-weight:800;font-size:1.35rem;letter-spacing:.04em;line-height:1.05;text-transform:uppercase}
+.top-in .quien small{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gris)}
+.top-sp{flex:1}
+.lnk{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;border:2px solid var(--amarillo);background:transparent;
+  color:var(--amarillo);font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;cursor:pointer}
+.lnk:hover,.lnk.solid{background:var(--amarillo);color:var(--tinta)}
+.lnk.solid:hover{background:#fff;border-color:#fff}
+
+/* ---------- selector de escenario ---------- */
+.selector{background:var(--panel);border-bottom:1px solid var(--linea);flex:none}
+.sel-in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.sel-lab{font-family:var(--display);font-style:italic;font-weight:800;font-size:1.2rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gris)}
+.seg{display:inline-flex;gap:8px;flex-wrap:wrap}
+.seg button{min-height:46px;padding:0 18px;border-radius:999px;border:2px solid #3A3A3A;background:transparent;cursor:pointer;
+  font-family:var(--display);font-style:italic;font-weight:800;font-size:1.2rem;letter-spacing:.04em;text-transform:uppercase;color:var(--blanco);white-space:nowrap}
+.seg button:hover{border-color:var(--amarillo);color:var(--amarillo)}
+.seg button[aria-pressed="true"]{background:var(--amarillo);border-color:var(--amarillo);color:var(--tinta)}
+.sel-info{font-size:13px;color:var(--gris);min-width:0}
+.sel-info .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel-2);border:1px solid var(--linea);border-radius:6px;padding:1px 7px;white-space:nowrap;color:var(--blanco)}
+
+/* ---------- layout ---------- */
+.wrap{flex:1;width:100%;max-width:1180px;margin:0 auto;padding:18px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-content:start;min-height:0}
+@media (min-width:900px){
+  .wrap{grid-template-columns:340px minmax(0,1fr);align-items:start}
+  .lateral{position:sticky;top:16px}
+}
+
+/* ---------- panel lateral (escritorio) ---------- */
+.lateral{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:18px}
+.lateral h2{font-family:var(--display);font-style:italic;font-weight:900;text-transform:uppercase;font-size:2rem;letter-spacing:.01em;line-height:1;color:var(--amarillo)}
+.lateral .sub{margin-top:10px;font-size:14px;color:var(--gris);line-height:1.55}
+.grp{margin-top:18px;padding-top:16px;border-top:1px solid var(--linea)}
+.grp h3{font-family:var(--display);font-style:italic;font-weight:800;text-transform:uppercase;font-size:1.15rem;letter-spacing:.1em;color:var(--blanco)}
+.grp .hint{margin-top:8px;font-size:12.5px;color:var(--gris);line-height:1.45}
+.rapidos{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.rapido{padding:10px 14px;border-radius:12px;border:1.5px solid #3A3A3A;background:var(--panel-2);font-size:14px;font-weight:500;color:var(--blanco);cursor:pointer;text-align:left;line-height:1.35;min-height:44px}
+.rapido:hover{border-color:var(--amarillo)}
+.accion{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 16px;border-radius:999px;border:2px solid var(--amarillo);background:transparent;
+  color:var(--amarillo);font-weight:700;font-size:14px;cursor:pointer;text-align:left}
+.accion:hover{background:var(--amarillo);color:var(--tinta)}
+.accion svg{flex:none}
+.acciones{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.accion.resalta{background:var(--amarillo);color:var(--tinta);animation:resalta 1.5s ease-in-out infinite}
+.rapidos-m .accion.resalta{order:-1}
+@keyframes resalta{0%,100%{box-shadow:0 0 0 0 rgba(255,204,0,.6)}50%{box-shadow:0 0 0 7px rgba(255,204,0,0)}}
+.fld{margin-top:10px}
+.fld input{width:100%;padding:10px 12px;border:1.5px solid var(--linea);border-radius:10px;background:var(--panel-2);font-size:12px;-webkit-appearance:none;appearance:none;color:var(--gris)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.btn-s{min-height:46px;padding:0 20px;border:2px solid var(--amarillo);border-radius:999px;background:var(--amarillo);color:var(--tinta);
+  font-family:var(--display);font-style:italic;font-weight:800;font-size:1.2rem;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;line-height:1}
+.btn-s:hover{background:#fff;border-color:#fff}
+.lat-links{margin-top:16px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:700}
+
+/* ---------- teléfono ---------- */
+.fono{background:#05080a;border:1px solid #243038;border-radius:28px;padding:9px;box-shadow:0 30px 70px -30px rgba(255,204,0,.12);
+  display:flex;flex-direction:column;overflow:hidden;height:min(780px,calc(100dvh - 250px));min-height:560px;max-width:430px;width:100%;margin:0 auto}
+.pantalla{flex:1;display:flex;flex-direction:column;background:var(--wa-fondo);border-radius:20px;overflow:hidden;min-height:0}
+.status{background:var(--wa-header);color:var(--wa-texto);display:flex;align-items:center;gap:8px;padding:7px 16px 5px;font-size:12px;font-weight:700}
+.status .sp{flex:1}
+.chat-hd{background:var(--wa-header);color:var(--wa-texto);display:flex;align-items:center;gap:11px;padding:8px 12px 10px;border-bottom:1px solid #0b141a}
+.chat-hd .back{opacity:.9;flex:none}
+.chat-hd .av{width:42px;height:42px;border-radius:50%;flex:none;background:var(--amarillo)}
+.chat-hd .quien{flex:1;min-width:0}
+.chat-hd .quien b{display:block;font-size:16px;font-weight:700;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-hd .quien small{display:block;font-size:12px;color:var(--wa-meta);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-hd .ico{display:flex;gap:16px;opacity:.9;flex:none;padding-right:2px;color:var(--wa-texto)}
+
+.hilo{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:12px 8px 14px;min-height:0;background-color:var(--wa-fondo);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%23182229' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 24h14M23 17v14'/%3E%3Ccircle cx='108' cy='30' r='8'/%3E%3Cpath d='M34 70c7-9 16-9 23 0'/%3E%3Cpath d='M86 86l9 9 16-18'/%3E%3Cpath d='M20 108h18v11H29l-5 6v-6h-4z'/%3E%3Cpath d='M118 116h11M123.5 110.5v11'/%3E%3Cpath d='M62 118h16'/%3E%3Cpath d='M70 40v12'/%3E%3C/g%3E%3C/svg%3E")}
+.demo-nota{display:block;max-width:92%;margin:2px auto 10px;background:#182229;color:var(--wa-meta);border-radius:8px;padding:8px 11px;font-size:12px;line-height:1.45;text-align:center;border:1px solid #243038}
+.dia{display:block;width:fit-content;margin:8px auto 12px;background:#182229;color:var(--wa-meta);border-radius:8px;padding:5px 12px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.fin{display:block;width:fit-content;max-width:90%;margin:8px auto 10px;background:#182229;color:var(--wa-texto);border-radius:10px;padding:10px 14px 12px;font-size:13px;line-height:1.45;text-align:center;border:1px solid #243038}
+.fin button{margin-top:8px;min-height:46px;padding:0 22px;border-radius:999px;border:2px solid var(--amarillo);background:var(--amarillo);color:var(--tinta);
+  font-family:var(--display);font-style:italic;font-weight:800;font-size:1.2rem;letter-spacing:.04em;text-transform:uppercase;line-height:1;cursor:pointer}
+.fin button:hover{background:#fff;border-color:#fff}
+.sis{display:block;width:fit-content;max-width:90%;margin:8px auto 10px;background:#182229;color:var(--wa-meta);border-radius:8px;padding:8px 12px;font-size:12.5px;line-height:1.45;text-align:center;border:1px solid #243038}
+.sis button{display:block;margin:8px auto 0;min-height:44px;padding:0 18px;border-radius:999px;border:2px solid var(--amarillo);background:transparent;color:var(--amarillo);font-weight:700;font-size:13px;cursor:pointer}
+.sis button:hover{background:var(--amarillo);color:var(--tinta)}
+
+.msg{width:fit-content;max-width:84%;margin:0 6px 8px;padding:6px 9px 7px;border-radius:8px;position:relative;box-shadow:0 1px 1px rgba(0,0,0,.35);
+  font-size:15.5px;line-height:1.42;color:var(--wa-texto);overflow-wrap:anywhere;animation:aparece .18s ease-out}
+@keyframes aparece{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.msg.del-neg{background:var(--wa-in);margin-right:auto;border-top-left-radius:0}
+.msg.del-cliente{background:var(--wa-out);margin-left:auto;border-top-right-radius:0}
+.msg .ln{display:block;white-space:pre-wrap}
+.msg .ln.sep{height:.85em}
+.msg .ln.li{padding-left:1.05em;text-indent:-1.05em}
+.msg .txt a{color:#53bdeb;text-decoration:underline;overflow-wrap:anywhere}
+.msg strong{font-weight:700}
+.msg .pie{float:right;margin:6px 0 -2px 10px;display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--wa-meta);line-height:1;user-select:none;white-space:nowrap}
+.msg .pie .ticks{color:var(--wa-tick)}
+.msg .pie .ticks.gris{color:var(--wa-meta)}
+.msg::after{content:"";display:block;clear:both}
+.msg.del-neg::before,.msg.del-cliente::before{content:"";position:absolute;top:0;width:9px;height:13px}
+.msg.del-neg::before{left:-8px;background:var(--wa-in);clip-path:polygon(100% 0,0 0,100% 100%)}
+.msg.del-cliente::before{right:-8px;background:var(--wa-out);clip-path:polygon(0 0,100% 0,0 100%)}
+
+/* carta: galería deslizable */
+.msg.carta{width:min(86%,330px);max-width:none;padding:6px 6px 7px}
+.carta-tira{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#3a4a53 transparent;padding-bottom:4px}
+.carta-tira button{flex:none;width:148px;scroll-snap-align:start;border:0;padding:0;background:#000;border-radius:6px;overflow:hidden;cursor:zoom-in;position:relative}
+.carta-tira img{width:100%;height:auto;aspect-ratio:900/1294;object-fit:cover}
+.carta-tira span{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.7);color:#fff;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700}
+.carta .tap{display:block;text-align:center;font-size:12px;font-weight:700;color:#53bdeb;padding:5px 0 0}
+.msg.carta::after{display:none}
+.msg.carta .pie{float:none;display:flex;justify-content:flex-end;margin:4px 2px 0 0}
+
+/* ubicación enviada */
+.msg.ubic{padding:5px 5px 7px;width:min(78%,270px);max-width:none}
+.ubic .mapa{height:92px;border-radius:6px;position:relative;overflow:hidden;
+  background-color:#e8e0cf;
+  background-image:linear-gradient(90deg,transparent 48%,#fff 48%,#fff 52%,transparent 52%),linear-gradient(0deg,transparent 60%,#fff 60%,#fff 66%,transparent 66%),
+    linear-gradient(35deg,transparent 40%,#f6c453 40%,#f6c453 44%,transparent 44%),linear-gradient(0deg,#cfe3c2 0 18%,transparent 18%)}
+.ubic .mapa svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-72%)}
+.ubic .t{padding:6px 4px 0;font-size:14px;line-height:1.35}
+.ubic .t b{display:block;font-weight:700}
+.ubic .t a{color:#53bdeb;word-break:break-all;font-size:12px}
+.msg.ubic::after{display:none}
+.msg.ubic .pie{float:none;display:flex;justify-content:flex-end;margin:2px 4px 0 0}
+
+/* comprobante de Yape simulado */
+.msg.yape{padding:5px 5px 7px;width:min(78%,260px);max-width:none}
+.yape .rec{background:#fff;color:#1b1b1b;border-radius:6px;padding:14px 14px 12px;text-align:center;border-top:6px solid #742284}
+.yape .rec .y{font-weight:800;font-size:1.25rem;color:#742284;letter-spacing:.02em}
+.yape .rec .ok{margin-top:6px;font-weight:700;font-size:15px}
+.yape .rec .m{margin-top:2px;font-size:1.9rem;font-weight:800;line-height:1.15}
+.yape .rec .f{margin-top:6px;font-size:11.5px;color:#555;line-height:1.4}
+.yape .rec .s{margin-top:8px;display:inline-block;border:1.5px dashed #999;color:#666;border-radius:4px;padding:1px 8px;font-size:10.5px;font-weight:700;letter-spacing:.08em}
+.msg.yape::after{display:none}
+.msg.yape .pie{float:none;display:flex;justify-content:flex-end;margin:4px 4px 0 0}
+
+.typing{display:flex;gap:4px;align-items:center;width:fit-content;margin:0 6px 8px;padding:11px 13px;background:var(--wa-in);border-radius:8px;border-top-left-radius:0}
+.typing i{width:7px;height:7px;border-radius:50%;background:#8696a0;animation:pulso 1.1s infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes pulso{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+
+.rapidos-m{display:none;gap:7px;padding:8px 8px 0;background:var(--wa-fondo);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.rapidos-m::-webkit-scrollbar{display:none}
+.rapidos-m .rapido,.rapidos-m .accion{white-space:nowrap;padding:0 14px;border-radius:999px;font-size:13px;flex:none;min-height:44px;display:inline-flex;align-items:center}
+.rapidos-m .accion{border-width:1.5px;gap:8px}
+
+.escribir{display:flex;align-items:flex-end;gap:7px;padding:7px 8px 9px;background:var(--wa-fondo)}
+.caja-txt{flex:1;display:flex;align-items:flex-end;gap:8px;background:var(--wa-caja);border-radius:22px;padding:10px 14px;min-width:0}
+.caja-txt svg{flex:none;color:var(--wa-meta);margin-bottom:2px}
+.caja-txt textarea{flex:1;border:0;outline:0;resize:none;overflow:hidden;max-height:100px;font-size:16px;line-height:1.4;background:transparent;color:var(--wa-texto);padding:0;min-width:0}
+.caja-txt textarea::placeholder{color:var(--wa-meta)}
+.enviar{flex:none;width:48px;height:48px;border-radius:50%;border:0;background:var(--wa-verde);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.enviar:hover{background:#029a79}
+.enviar:disabled{opacity:.5;cursor:progress}
+
+footer{border-top:1px solid var(--linea);background:var(--carbon);flex:none}
+.foot{max-width:1180px;margin:0 auto;padding:12px 16px;display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--gris)}
+.foot a{color:var(--blanco);text-decoration:none;font-weight:700}
+.foot a:hover{text-decoration:underline}
+.foot .sp{flex:1}
+
+/* visor de la carta */
+.visor{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.94);display:flex;flex-direction:column}
+.visor-img{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;display:flex;padding:10px}
+.visor-img img{margin:auto;width:auto;max-width:100%;max-height:100%;height:auto;border-radius:6px;background:#000;cursor:zoom-in}
+.visor.zoom .visor-img img{max-width:none;max-height:none;width:min(1100px,170vw);cursor:zoom-out}
+.visor-bar{display:flex;gap:8px;justify-content:center;align-items:center;padding:10px 10px calc(10px + env(safe-area-inset-bottom));flex-wrap:wrap}
+.visor-bar span{color:var(--gris);font-size:13px;font-weight:700;min-width:96px;text-align:center}
+.visor-bar button{min-height:46px;padding:0 20px;border-radius:999px;border:2px solid var(--amarillo);background:transparent;color:var(--amarillo);font-weight:700;font-size:15px;cursor:pointer}
+.visor-bar button:hover{background:var(--amarillo);color:var(--tinta)}
+.visor-bar button:disabled{opacity:.35;cursor:default}
+
+/* ---------- móvil: la pantalla es la app ---------- */
+@media (max-width:899px){
+  body{height:100dvh;overflow:hidden}
+  .aviso{display:none}
+  .top-in{padding:4px 12px;gap:8px}
+  .top-in .logo{height:38px}
+  .top-in .quien{display:none}
+  .lnk{padding:0 14px;font-size:13px}
+  .sel-in{padding:6px 12px;gap:8px}
+  .sel-lab{display:none}
+  .seg{width:100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .seg::-webkit-scrollbar{display:none}
+  .seg button{flex:1 0 auto;padding:0 12px;font-size:1.02rem}
+  .seg .lg{display:none}
+  .sel-info{display:none}
+  .wrap{padding:0;display:block;min-height:0;overflow:hidden}
+  .lateral{display:none}
+  .fono{height:100%;max-width:none;border-radius:0;padding:0;box-shadow:none;border:0;background:transparent;min-height:0}
+  .pantalla{border-radius:0}
+  .status{display:none}
+  .rapidos-m{display:flex}
+  .foot{padding:6px 12px;font-size:11px;justify-content:center;text-align:center}
+  .foot .sp,.foot .largo{display:none}
+}
+@media (min-width:900px){ .foot .corto{display:none} }
+@media (prefers-reduced-motion:reduce){ *{animation:none !important} }
+</style>
+</head>
+<body>
+
+<div class="aviso">Demostración de IJV Agency para Taikiri Burger. Conversación simulada, no es un canal real</div>
+
+<header class="top">
+  <div class="top-in">
+    <img class="logo" src="assets/logo-dorado.png" width="105" height="140" alt="Taikiri Burger">
+    <div class="quien"><b>Simulador de WhatsApp</b><small>Demo del agente</small></div>
+    <div class="top-sp"></div>
+    <a class="lnk" href="./">Sitio</a>
+    <a class="lnk solid" href="pedidos.html" id="lnk-panel">Panel del equipo</a>
+  </div>
+</header>
+
+<div class="selector">
+  <div class="sel-in">
+    <span class="sel-lab">Simular a:</span>
+    <div class="seg" role="group" aria-label="Escenario de la demo">
+      <button type="button" id="seg-a" aria-pressed="true">Pedido a pie</button>
+      <button type="button" id="seg-b" aria-pressed="false">Cliente frecuente</button>
+      <button type="button" id="seg-c" aria-pressed="false"><span class="lg">Pedido para </span>mi empresa</button>
+    </div>
+    <p class="sel-info" id="sel-info"></p>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============ panel lateral (escritorio) ============ -->
+  <aside class="lateral">
+    <h2>Así ve tu cliente al agente</h2>
+    <p class="sub">Escríbele como lo haría un cliente por WhatsApp. El agente toma el pedido hasta confirmarlo; tu equipo lo ve como comanda en el panel.</p>
+
+    <div class="grp">
+      <h3>Enviar como cliente</h3>
+      <div class="acciones">
+        <button class="accion" type="button" data-acc="ubic">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0114 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/></svg>
+          Enviar ubicación
+        </button>
+        <button class="accion" type="button" data-acc="yape">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+          Adjuntar comprobante de Yape
+        </button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3>Mensajes sugeridos</h3>
+      <div class="rapidos" id="rapidos-d"></div>
+      <p class="hint">Se escriben en la caja de texto; tú decides cuándo enviarlos.</p>
+    </div>
+
+    <div class="grp">
+      <h3>Pedido</h3>
+      <div class="fld"><input type="text" id="in-sesion" class="mono" aria-label="Identificador de la conversación" readonly></div>
+      <div class="fld"><button class="btn-s" id="btn-nueva" type="button">Nuevo pedido</button></div>
+      <p class="hint">Cada pedido abre una conversación nueva.</p>
+    </div>
+
+    <div class="lat-links">
+      <a href="pedidos.html">Ver el panel del equipo</a>
+      <a href="./">Volver al sitio</a>
+    </div>
+  </aside>
+
+  <!-- ============ teléfono ============ -->
+  <div class="fono">
+    <div class="pantalla">
+
+      <div class="status">
+        <span id="st-hora">&nbsp;</span>
+        <span class="sp"></span>
+        <svg width="17" height="11" viewBox="0 0 17 11" fill="currentColor" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="2.5" width="3" height="8.5" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true"><rect x=".7" y=".7" width="19" height="10.6" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.1" opacity=".6"/><rect x="2.2" y="2.2" width="14.5" height="7.6" rx="1.5" fill="currentColor"/><path d="M21.4 4.2v3.6c1-.3 1.5-.8 1.5-1.8s-.5-1.5-1.5-1.8z" fill="currentColor" opacity=".6"/></svg>
+      </div>
+
+      <div class="chat-hd">
+        <svg class="back" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        <img class="av" src="assets/avatar.png" width="42" height="42" alt="">
+        <div class="quien">
+          <b>Taikiri Burger &middot; demo</b>
+          <small id="hd-estado">en línea</small>
+        </div>
+        <div class="ico">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1 1 .4 1.9.7 2.8a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.3-1.2a2 2 0 012.1-.5c.9.3 1.8.6 2.8.7a2 2 0 011.7 2z"/></svg>
+          <svg width="5" height="19" viewBox="0 0 5 19" fill="currentColor" aria-hidden="true"><circle cx="2.5" cy="2.5" r="2.1"/><circle cx="2.5" cy="9.5" r="2.1"/><circle cx="2.5" cy="16.5" r="2.1"/></svg>
+        </div>
+      </div>
+
+      <div class="hilo" id="hilo" role="log" aria-live="polite" aria-label="Conversación de WhatsApp"></div>
+
+      <div class="rapidos-m" id="rapidos-m"></div>
+
+      <form class="escribir" id="form">
+        <div class="caja-txt">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9.2"/><path d="M8.4 14.2c.9 1.2 2.1 1.8 3.6 1.8s2.7-.6 3.6-1.8" stroke-linecap="round"/><circle cx="9" cy="10" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1.1" fill="currentColor" stroke="none"/></svg>
+          <textarea id="in-msg" rows="1" placeholder="Mensaje" autocomplete="off" aria-label="Mensaje"></textarea>
+        </div>
+        <button class="enviar" id="btn-enviar" type="submit" aria-label="Enviar mensaje">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.3 21.3l19.4-8.7c.9-.4.9-1.7 0-2.1L2.3 1.8c-.8-.4-1.6.3-1.4 1.1L3 10.3c.1.4.4.6.8.7l8.5 1-8.5 1c-.4 0-.7.3-.8.7L.9 20.2c-.2.8.6 1.5 1.4 1.1z"/></svg>
+        </button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <span><span class="corto">Demo de <b>IJV Agency</b></span><span class="largo">Simulador preparado por <b>IJV Agency</b> para una demostración. Los datos que se escriban aquí son de prueba.</span></span>
+    <span class="sp"></span>
+    <a href="https://ijvagency.com/" target="_blank" rel="noopener">Powered by IJV</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------------- backend ---------------- */
+  var BASE_DEF = 'https://meta.ijvagency.com/webhook';
+  var qs = new URLSearchParams(location.search);
+  /* El override ?api= solo se acepta sirviendo en local (pruebas contra un stub).
+     En producción la página siempre habla con el webhook real. */
+  var esLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  var BASE = (esLocal && qs.get('api')) ? qs.get('api').replace(/\/$/,'') : BASE_DEF;
+  var EP_CHAT = BASE + '/taikiriburger-demo-agent';
+  /* Fuera de http(s) (file://) NUNCA se llama al webhook real: se usa el guion local. */
+  var ORIGEN_WEB = /^https?:$/.test(location.protocol);
+  var MOCK_URL = qs.get('mock') === '1' || !ORIGEN_WEB;
+  var ENSAYO = qs.get('ensayo') === '1';
+
+  var TZ = 'America/Lima';
+  var TIMEOUT = 45000;        /* el agente con catálogo inline puede tardar */
+  var REINTENTOS = 1;         /* un reintento ante red/5xx y se avisa: nada de bucles */
+  var K = 'tkrdemo:v1';       /* sessionStorage: estable por pestaña */
+  var K_MOCK = 'tkr:mock-pedidos';     /* localStorage: pedidos del guion local, para el panel en ?mock=1 */
+  var K_MOCK_C = 'tkr:mock-corporativos';
+  var UBICACION = 'https://maps.google.com/?q=-11.9,-77.05';
+  var YAPE_NUM = '999 999 999';
+  var CARTA = [];
+  for(var ci = 1; ci <= 8; ci++) CARTA.push('assets/carta-' + ci + '.jpg');
+
+  /* ---------------- escenarios ---------------- */
+  var ESC = {
+    a: { corto:'Pedido a pie', tel:null, cliente:'',
+         info:'Cliente nuevo que escribe por primera vez. Número ',
+         saludo:'¡Hola! Bienvenido(a) a *Taikiri Burger*, el sabor buenazo de todo Collique. Te compartimos nuestra carta. Cuéntanos qué se te antoja y te tomamos el pedido.',
+         inicio:['Quiero una doble carne y una porción de 6 alitas BBQ', 'Hola, ¿tienes hamburguesa doble carne?'],
+         pedido:['Quiero una doble carne y una porción de 6 alitas BBQ'] },
+    b: { corto:'Cliente frecuente', tel:'51999000222', cliente:'Rosa Elena Quispe', direccion:'Av. Revolución 1500, Collique, Comas',
+         info:'Cliente conocida: Rosa Elena Quispe, con nombre y dirección guardados. Número ',
+         saludo:'Hola, Rosa. Qué gusto saludarte otra vez en *Taikiri Burger*. Aquí tienes la carta por si quieres revisarla. ¿Qué se te antoja hoy?',
+         inicio:['Hola, quiero hacer un pedido'],
+         pedido:['Una Hamburguesa Royal y un frappé de fresa'] },
+    c: { corto:'Pedido para mi empresa', tel:null, cliente:'',
+         info:'Persona que pide para su empresa. Número ',
+         saludo:'¡Hola! Bienvenido(a) a *Taikiri Burger*. Te compartimos nuestra carta. Cuéntanos qué necesitas y una persona de nuestro equipo te acompaña.',
+         inicio:['Quiero hacer un pedido para mi oficina, somos 25 personas'], pedido:[] }
+  };
+
+  /* ---------------- utilidades ---------------- */
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function rnd(n){ var s=''; for(var i=0;i<n;i++) s += Math.floor(Math.random()*10); return s; }
+  function nuevaSesion(){
+    return (ENSAYO ? 'ensayo_' : '') + 'tkr_demo_' + Math.random().toString(16).slice(2,10) + Date.now().toString(36).slice(-4);
+  }
+  function nuevoTelefono(esc_){ return ESC[esc_].tel || ('519' + rnd(8)); }
+  function telBonito(t){ t = String(t||''); return /^51\d{9}$/.test(t) ? '+51 ' + t.slice(2,5) + ' ' + t.slice(5,8) + ' ' + t.slice(8) : t; }
+  function norm(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+  function soles(n){ n = +n; return 'S/ ' + (n === Math.floor(n) ? n.toFixed(0) : n.toFixed(2)); }
+
+  /* Hora al estilo WhatsApp de Lima: "9:13 a. m." */
+  function hora(v){
+    var d = (v instanceof Date) ? v : (v ? new Date(v) : new Date());
+    if(isNaN(d)) d = new Date();
+    var s;
+    try{ s = new Intl.DateTimeFormat('es-PE',{timeZone:TZ,hour:'numeric',minute:'2-digit',hour12:true}).format(d); }
+    catch(e){ var h=d.getHours(), m=('0'+d.getMinutes()).slice(-2); s = ((h%12)||12)+':'+m+' '+(h<12?'a':'p')+'. m.'; }
+    return s.replace(/[  ]/g,' ').replace(/\s*\b([APap])\.?\s*[Mm]\.?/, function(_,l){ return ' ' + l.toLowerCase() + '. m.'; });
+  }
+  function diaLargo(d){
+    try{ return new Intl.DateTimeFormat('es-PE',{timeZone:TZ,weekday:'long',day:'numeric',month:'long'}).format(d); }
+    catch(e){ return 'hoy'; }
+  }
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  function lsJSON(k){ try{ var v = JSON.parse(lsGet(k) || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
+
+  /* ---------------- estado (sessionStorage, con respaldo en memoria) ---------------- */
+  function lee(){ try{ return JSON.parse(sessionStorage.getItem(K) || 'null'); }catch(e){ return null; } }
+  function guarda(){
+    try{
+      sessionStorage.setItem(K, JSON.stringify({ esc:st.esc, tel:st.tel, sesion:st.sesion, msgs:st.msgs.slice(-80), mock:st.mock, ms:st.ms }));
+    }catch(e){}
+  }
+  var prev = lee();
+  var qEsc = (qs.get('escenario') || '').toLowerCase();
+  var st = {
+    esc: ESC[qEsc] ? qEsc : ((prev && ESC[prev.esc]) ? prev.esc : 'a'),
+    tel:'', sesion:'', msgs:[], mock: MOCK_URL, ms: null,
+    enVuelo:false, esperando:false
+  };
+  if(prev && prev.sesion && Array.isArray(prev.msgs) && prev.esc === st.esc){
+    st.tel = prev.tel; st.sesion = prev.sesion; st.msgs = prev.msgs; st.ms = prev.ms || null;
+    st.mock = MOCK_URL || !!prev.mock;
+  }else{
+    st.tel = nuevoTelefono(st.esc); st.sesion = nuevaSesion();
+  }
+
+  /* ---------------- red ---------------- */
+  function post(url, body, ms){
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    var to = setTimeout(function(){ if(ctl) ctl.abort(); }, ms||TIMEOUT);
+    return fetch(url,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body), signal:ctl?ctl.signal:undefined, cache:'no-store'
+    }).then(function(r){
+      clearTimeout(to);
+      return r.text().then(function(t){
+        var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+        if(!r.ok){ var err=new Error('HTTP '+r.status); err.status=r.status; err.cuerpo=j||t; throw err; }
+        return j||{};
+      });
+    }, function(e){ clearTimeout(to); throw e; });
+  }
+  /* Un reintento solo ante fallos transitorios (red, 5xx). Un 4xx (404 = workflow sin
+     publicar, 429 = límite por IP) NO se reintenta: no cambiaría nada y solo sumaría carga. */
+  function postConReintento(url, body, intento){
+    intento = intento || 0;
+    return post(url, body).catch(function(e){
+      var transitorio = !e.status || e.status >= 500;
+      if(transitorio && intento < REINTENTOS) return postConReintento(url, body, intento+1);
+      throw e;
+    });
+  }
+
+  /* ---------------- formato del texto (estilo WhatsApp) ----------------
+     Se escapa SIEMPRE primero (XSS) y recién después se reponen negritas,
+     cursivas, tachado, viñetas y enlaces. */
+  function enLinea(l){
+    var h = esc(l);
+    h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    h = h.replace(/(^|[^\w*])\*([^*\n]+)\*(?![\w*])/g, '$1<strong>$2</strong>');
+    h = h.replace(/(^|[^\w_])_([^_\n]+)_(?![\w_])/g, '$1<em>$2</em>');
+    h = h.replace(/(^|[^\w~])~([^~\n]+)~(?![\w~])/g, '$1<s>$2</s>');
+    return h;
+  }
+  function fmt(texto){
+    var s = String(texto==null?'':texto).replace(/\r\n?/g,'\n');
+    s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '$1: $2');   /* [txt](url) -> txt: url */
+    return s.split('\n').map(function(l){
+      if(!l.trim()) return '<span class="ln sep"></span>';
+      var m = /^\s*[-•]\s+(.*)$/.exec(l);
+      if(m) return '<span class="ln li">• ' + enLinea(m[1]) + '</span>';
+      return '<span class="ln">' + enLinea(l) + '</span>';
+    }).join('');
+  }
+
+  /* Enlaces clicables por DOM: `a.href` por propiedad y el texto por textContent;
+     la regex exige http(s): nada de `javascript:` ni `data:`. */
+  var RE_URL = /https?:\/\/[^\s<>"']+/g;
+  var CIERRES = '.,;:!?)]}»"\'';
+  function enlaza(root){
+    var textos = [], w, n;
+    try{ w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false); }catch(e){ return; }
+    while((n = w.nextNode())) if(n.nodeValue && n.nodeValue.indexOf('http') >= 0) textos.push(n);
+    textos.forEach(function(nodo){
+      var t = nodo.nodeValue, frag = document.createDocumentFragment(), i = 0, m, hubo = false;
+      RE_URL.lastIndex = 0;
+      while((m = RE_URL.exec(t)) !== null){
+        var url = m[0], cola = '';
+        while(url.length && CIERRES.indexOf(url.charAt(url.length-1)) >= 0){
+          cola = url.charAt(url.length-1) + cola;
+          url = url.slice(0,-1);
+        }
+        if(!url) continue;
+        if(m.index > i) frag.appendChild(document.createTextNode(t.slice(i, m.index)));
+        var a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = url;
+        frag.appendChild(a);
+        i = m.index + m[0].length - cola.length;
+        hubo = true;
+      }
+      if(!hubo) return;
+      if(i < t.length) frag.appendChild(document.createTextNode(t.slice(i)));
+      nodo.parentNode.replaceChild(frag, nodo);
+    });
+  }
+
+  /* ---------------- render del hilo ---------------- */
+  var TICKS_LEIDO = '<svg class="ticks" width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Leído"><path d="M1 5.9l2.5 2.6L8.7 3"/><path d="M6.3 8.5L11.5 3"/></svg>';
+  var TICKS_ENVIADO = '<svg class="ticks gris" width="12" height="11" viewBox="0 0 12 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Enviado"><path d="M1 5.9l2.5 2.6L9.5 2.4"/></svg>';
+
+  /* Safari/iOS no baja el hilo si el layout aún no se actualizó: rAF de red. */
+  function abajo(){
+    var h = $('hilo');
+    h.scrollTop = h.scrollHeight;
+    if(typeof requestAnimationFrame === 'function') requestAnimationFrame(function(){ h.scrollTop = h.scrollHeight; });
+  }
+
+  function notaDemo(){
+    return (st.mock ? 'Guion de ejemplo, sin IA. ' : '') + notaBase();
+  }
+  function notaBase(){
+    return st.esc === 'b'
+      ? 'Demo: este número está registrado como cliente frecuente (' + ESC.b.cliente + '): el agente ya tiene su nombre y dirección.'
+      : (st.esc === 'c'
+        ? 'Demo: así atendería el agente a una empresa. Califica la necesidad y la pasa a una persona; no cotiza.'
+        : 'Demo: así atendería el agente tu WhatsApp. Escríbele como un cliente que pide por primera vez.');
+  }
+  var ICO_PIN = '<svg width="38" height="38" viewBox="0 0 24 24" fill="#e53935" aria-hidden="true"><path d="M12 22s-7-6.1-7-11.5a7 7 0 0114 0C19 15.9 12 22 12 22z"/><circle cx="12" cy="10.5" r="2.7" fill="#fff"/></svg>';
+
+  function pinta(alTope){
+    var h = $('hilo');
+    var html = '<span class="demo-nota">' + esc(notaDemo()) + '</span>'
+      + '<span class="dia">' + esc(diaLargo(new Date())) + '</span>';
+
+    st.msgs.forEach(function(m){
+      if(m.dir === 'sis'){
+        html += '<span class="sis">' + esc(m.texto)
+          + (m.mockBtn ? '<button type="button" data-mock="1">Continuar con el guion de ejemplo (sin IA)</button>' : '') + '</span>';
+        return;
+      }
+      if(m.dir === 'fin'){
+        html += '<div class="fin"><p>' + esc(m.corp
+            ? 'Esta solicitud ya quedó anotada. Para otra empresa, abre un pedido nuevo.'
+            : 'Este pedido ya quedó registrado. En la demo, cada conversación cierra un solo pedido.')
+          + '</p><button type="button" data-nuevo="1">Nuevo pedido</button></div>';
+        return;
+      }
+      if(m.dir === 'carta'){
+        html += '<div class="msg carta del-neg"><div class="carta-tira" tabindex="0" aria-label="Carta de Taikiri Burger, 8 páginas">';
+        CARTA.forEach(function(src, i){
+          html += '<button type="button" data-carta="' + i + '" aria-label="Ampliar la carta, página ' + (i+1) + ' de 8">'
+               + '<img src="' + esc(src) + '" width="148" height="213" loading="lazy" alt="Carta de Taikiri Burger, página ' + (i+1) + '">'
+               + '<span>' + (i+1) + ' / 8</span></button>';
+        });
+        html += '</div><span class="tap">Desliza y toca una página para ampliarla</span>'
+              + '<span class="pie">' + esc(hora(m.ts)) + '</span></div>';
+        return;
+      }
+      var mio = m.dir === 'in';
+      if(m.tipo === 'ubic'){
+        html += '<div class="msg ubic del-cliente"><div class="mapa">' + ICO_PIN + '</div>'
+              + '<div class="t"><b>Ubicación</b><a href="' + esc(m.url) + '" target="_blank" rel="noopener noreferrer">' + esc(m.url) + '</a></div>'
+              + '<span class="pie">' + esc(hora(m.ts)) + (m.leido?TICKS_LEIDO:TICKS_ENVIADO) + '</span></div>';
+        return;
+      }
+      if(m.tipo === 'yape'){
+        html += '<div class="msg yape del-cliente"><div class="rec"><div class="y">Yape</div><div class="ok">Yapeaste</div>'
+              + (m.monto ? '<div class="m">' + esc(soles(m.monto)) + '</div>' : '')
+              + '<div class="f">A: Taikiri Burger (demo)<br>Cel. ' + esc(YAPE_NUM) + '<br>' + esc(diaLargo(new Date(m.ts))) + ', ' + esc(hora(m.ts)) + '</div>'
+              + '<span class="s">COMPROBANTE SIMULADO</span></div>'
+              + '<span class="pie">' + esc(hora(m.ts)) + (m.leido?TICKS_LEIDO:TICKS_ENVIADO) + '</span></div>';
+        return;
+      }
+      html += '<div class="msg ' + (mio?'del-cliente':'del-neg') + '">'
+            + '<span class="txt">' + fmt(m.texto) + '</span>'
+            + '<span class="pie">' + esc(hora(m.ts)) + (mio?(m.leido?TICKS_LEIDO:TICKS_ENVIADO):'') + '</span>'
+            + '</div>';
+    });
+    if(st.esperando) html += '<div class="typing" aria-label="escribiendo"><i></i><i></i><i></i></div>';
+
+    h.innerHTML = html;
+    var txts = h.querySelectorAll('.msg .txt');
+    for(var i=0;i<txts.length;i++) enlaza(txts[i]);
+    if(alTope){
+      h.scrollTop = 0;
+      if(typeof requestAnimationFrame === 'function') requestAnimationFrame(function(){ h.scrollTop = 0; });
+    }else abajo();
+    guarda();
+  }
+
+  /* ---------------- visor de la carta (zoom + navegación) ---------------- */
+  function abreVisor(i0){
+    var i = +i0 || 0;
+    var v = document.createElement('div');
+    v.className = 'visor'; v.setAttribute('role','dialog'); v.setAttribute('aria-modal','true'); v.setAttribute('aria-label','Carta ampliada');
+    v.innerHTML = '<div class="visor-img"><img alt=""></div>'
+      + '<div class="visor-bar"><button type="button" data-v="prev">Anterior</button><span></span>'
+      + '<button type="button" data-v="next">Siguiente</button><button type="button" data-v="x">Cerrar</button></div>';
+    var im = v.querySelector('img'), tx = v.querySelector('span');
+    var bp = v.querySelector('[data-v="prev"]'), bn = v.querySelector('[data-v="next"]');
+    function muestra(){
+      im.src = CARTA[i]; im.alt = 'Carta de Taikiri Burger, página ' + (i+1) + ' de ' + CARTA.length;
+      tx.textContent = 'Página ' + (i+1) + ' de ' + CARTA.length;
+      bp.disabled = i === 0; bn.disabled = i === CARTA.length - 1;
+      v.classList.remove('zoom');
+    }
+    function cierra(){ if(v.parentNode) v.parentNode.removeChild(v); document.removeEventListener('keydown', tecla); }
+    function tecla(ev){
+      if(ev.key === 'Escape') cierra();
+      else if(ev.key === 'ArrowRight' && i < CARTA.length-1){ i++; muestra(); }
+      else if(ev.key === 'ArrowLeft' && i > 0){ i--; muestra(); }
+    }
+    v.addEventListener('click', function(ev){
+      var b = ev.target.closest && ev.target.closest('button[data-v]');
+      if(b){
+        var a = b.getAttribute('data-v');
+        if(a === 'x') cierra();
+        else if(a === 'prev' && i > 0){ i--; muestra(); }
+        else if(a === 'next' && i < CARTA.length-1){ i++; muestra(); }
+        return;
+      }
+      if(ev.target === im) v.classList.toggle('zoom');
+      else if(ev.target.classList.contains('visor-img') || ev.target === v) cierra();
+    });
+    document.addEventListener('keydown', tecla);
+    document.body.appendChild(v); muestra();
+    v.querySelector('[data-v="x"]').focus();
+  }
+
+  /* ---------------- guion local (?mock=1 o plan B si el webhook falla) ----------------
+     Sin IA ni red. Reproduce el flujo real del restaurante con la carta verificada:
+     pedido -> nombre -> recojo o delivery -> indicaciones -> cuenta -> "ya pagué".
+     Al cerrar guarda el pedido en localStorage para que pedidos.html?mock=1 lo muestre. */
+  var CAT = [
+    { re:/\bdoble carne\b|\bdoble\b/, n:'Hamburguesa Doble Carne', p:17, d:'pan brioche, doble carne casera y queso cheddar, con papas, lechuga y tomate' },
+    { re:/\bhamburguesa royal\b|\broyal\b/, n:'Hamburguesa Royal', p:13, d:'pan brioche, carne casera, queso cheddar y huevo, con papas, lechuga y tomate' },
+    { re:/hawaian/, n:'Hamburguesa Hawaiana', p:12, d:'pan brioche, carne casera, queso cheddar y piña, con papas, lechuga y tomate' },
+    { re:/americana/, n:'Hamburguesa Americana', p:15, d:'pan brioche, carne casera, queso cheddar y peperoni, con papas, lechuga y tomate' },
+    { re:/carretillera/, n:'Hamburguesa Carretillera', p:19, d:'pan brioche, carne casera, huevo, queso, tocino y deshilachado, con papas, lechuga y tomate' },
+    { re:/crunch/, n:'Hamburguesa Crunch', p:13, d:'pan brioche y pechuga de pollo crocante, con papas, lechuga y tomate' },
+    { re:/a lo pobre/, n:'Hamburguesa a lo Pobre', p:17, d:'pan brioche, carne casera, plátano, queso cheddar y huevo, con papas, lechuga y tomate' },
+    { re:/hamburguesa clasica|\bclasica\b|hamburguesa simple/, n:'Hamburguesa Clásica', p:10, d:'pan brioche y carne casera, con papas, lechuga y tomate' },
+    { re:/smash taikiri|\bsmash\b/, n:'Smash Taikiri', p:25, d:'triple smash, queso cheddar, tocineta y huevo, con papas fritas y ensalada' },
+    { re:/salchipapa/, n:'Salchipapa Clásica', p:9, d:'hotdog ahumado, papas y ensalada' },
+    { re:/papas fritas|porcion de papas|papitas/, n:'Papas fritas (adicional)', p:7, d:'' },
+    { re:/chaufa/, n:'Porción de chaufa', p:5, d:'' },
+    { re:/frappe/, n:'Frappé', p:15, d:'sabores: moca, fresa, caramelo, oreo y mango', variante:/moca|fresa|caramelo|oreo|mango/ },
+    { re:/milkshake|batido/, n:'Milkshake', p:15, d:'sabores: fresa, chocolate y mango', variante:/fresa|chocolate|mango/ },
+    { re:/gordita/, n:'Gordita (Inca Kola)', p:5, d:'' },
+    { re:/inca ?kola|inka ?kola/, n:'Inca Kola personal', p:2.5, d:'' },
+    { re:/coca ?cola/, n:'Coca Cola personal', p:2.5, d:'' }
+  ];
+  var NUM = { un:1, una:1, dos:2, tres:3, cuatro:4, cinco:5, seis:6 };
+  var SALSAS = [ ['acevichada','Acevichada'], ['bbq','BBQ'], ['maracuya','Maracuyá'], ['bufalo','Búfalo'] ];
+
+  function msInicial(){
+    return { items:[], nombre:'', entrega:'', ubic:'', notas:'', preguntoNotas:false, cuenta:false, pago:'', pagoPref:'', cerrado:false,
+             salsaPend:null, corp:{ contacto:'', ocasion:'', personas:'', fecha:'', hora:'', lugar:'', factura:'', presupuesto:'' }, corpPidio:'', fase:'' };
+  }
+  function cant(n, idx){
+    var antes = n.slice(Math.max(0, idx - 16), idx).trim().split(/\s+/).slice(-3);
+    for(var i = antes.length - 1; i >= 0; i--){
+      var w = antes[i];
+      if(/^\d{1,2}$/.test(w)) return +w;
+      if(NUM[w]) return NUM[w];
+    }
+    return 1;
+  }
+  function parseaItems(t){
+    var n = norm(t), out = [];
+    /* alitas: tamaño por número en el texto */
+    var am = /(?:(\d{1,2}|seis|doce|dieciocho)\s*(?:unidades\s*de\s*)?alitas|alitas\s*(?:de\s*)?(\d{1,2}|seis|doce|dieciocho))/.exec(n);
+    if(am){
+      var tam = am[1] || am[2];
+      tam = ({seis:6, doce:12, dieciocho:18})[tam] || +tam;
+      if(tam === 6 || tam === 12 || tam === 18){
+        var precios = { 6:18, 12:33, 18:50 }, nsal = { 6:1, 12:2, 18:3 };
+        var sal = SALSAS.filter(function(s){ return n.indexOf(s[0]) >= 0; }).map(function(s){ return s[1]; });
+        out.push({ n:'Alitas ' + tam + ' unidades', p:precios[tam], q:cant(n, am.index), salsas:sal, nsal:nsal[tam] });
+      }
+    }else if(/alitas crispy|alitas crujientes/.test(n)){
+      out.push({ n:'Alitas Crispy', p:18, q:1, salsas:[], nsal:0 });
+    }
+    CAT.forEach(function(c){
+      if(/frappe/.test(n) === false && c.n === 'Frappé') return;
+      var m = c.re.exec(n);
+      if(!m) return;
+      if(c.n === 'Hamburguesa Clásica' && out.some(function(o){ return /^Hamburguesa/.test(o.n); })) return;
+      if(c.n === 'Hamburguesa Doble Carne' && /doble/.test(n) === false) return;
+      var it = { n:c.n, p:c.p, q:cant(n, m.index), d:c.d };
+      if(c.variante){
+        var vm = c.variante.exec(n.slice(m.index));
+        if(vm){ var nombres = { moca:'moca', fresa:'fresa', caramelo:'caramelo', oreo:'oreo', mango:'mango', chocolate:'chocolate' }; it.n += ' de ' + nombres[vm[0]]; }
+      }
+      out.push(it);
+    });
+    return out;
+  }
+  function totalMs(ms){ return ms.items.reduce(function(a,it){ return a + it.p * it.q; }, 0); }
+  function lineaItem(it){
+    var nombre = it.n + (it.salsas && it.salsas.length ? ' (' + it.salsas.join(' y ') + ')' : '');
+    return { txt: it.q + 'x ' + nombre, sub: it.p * it.q };
+  }
+  function resumenMs(ms){
+    var lineas = ms.items.map(function(it){ var l = lineaItem(it); return '- ' + l.txt + ': ' + soles(l.sub); });
+    var delivery = ms.entrega && !/^recojo/i.test(ms.entrega);
+    return 'Resumen de tu pedido:\n' + lineas.join('\n') + '\n\nTotal: ' + soles(totalMs(ms))
+      + '\nNombre: ' + ms.nombre
+      + '\nEntrega: ' + ms.entrega + (ms.ubic ? '. Ubicación: ' + ms.ubic : '')
+      + (ms.notas && !/^ninguna/i.test(ms.notas) ? '\nIndicaciones: ' + ms.notas : '')
+      + (delivery ? '\n\nEl costo del delivery lo confirma la casa.' : '');
+  }
+  var PREG_CORP = {
+    contacto:'¿Con quién hablamos? Dime tu nombre y el de tu empresa.',
+    ocasion:'¿Cuál es la ocasión? Por ejemplo, almuerzo de equipo, reunión o evento.',
+    personas:'¿Para cuántas personas sería?',
+    fecha:'¿Para qué fecha lo necesitas?',
+    hora:'¿A qué hora debería llegar?',
+    lugar:'¿Dónde sería la entrega? Dime la dirección o el lugar del evento.',
+    factura:'¿Necesitas factura?',
+    presupuesto:'¿Tienes un presupuesto aproximado?'
+  };
+  var ORDEN_CORP = ['contacto','ocasion','personas','fecha','hora','lugar','factura','presupuesto'];
+
+  function guardaMock(clave, obj){
+    var l = lsJSON(clave).filter(function(x){ return x.id !== obj.id; });
+    l.push(obj);
+    lsSet(clave, JSON.stringify(l.slice(-40)));
+  }
+  function idPedido(){ return 'TK-' + (1000 + Math.floor(Math.random()*8999)); }
+
+  function mockTurno(t, silencioso){
+    var ms = st.ms; var n = norm(t);
+    var saludo = /^(hola+|buenas|buenos dias|buen dia|buenas tardes|buenas noches|hey)\b/.test(n);
+
+    /* ----- corporativo: califica y pasa, sin cotizar ----- */
+    if(st.esc === 'c'){
+      var c = ms.corp;
+      if(ms.cerrado) return 'Tu solicitud ya quedó anotada. Una persona de Taikiri Burger te escribe para armar la propuesta.';
+      if(/precio|cuanto cuesta|cuanto sale|cotiza|descuento|tarifa/.test(n) && !ms.corpPidio){
+        ms.corpPidio = 'contacto';
+        return 'El precio lo define una persona del equipo al armar la propuesta. Para pasarle tu solicitud necesito unos datos. ' + PREG_CORP.contacto;
+      }
+      /* Se reconoce QUÉ dato trae el mensaje (da igual el orden en que el cliente lo mande);
+         si no se reconoce nada, se asume que responde a la última pregunta. */
+      var hallo = false;
+      function pon(k, v, forzar){ if(v && (forzar || !c[k])){ c[k] = String(v).trim(); hallo = true; } }
+      var mp = /(\d{1,4})\s*personas/.exec(n);
+      if(mp) pon('personas', mp[1]);
+      var fuerte = /almuerzo|reunion|evento|cumple|integracion|capacitacion|desayuno|cena\b|fiesta|celebracion|aniversario/.test(n);
+      if(fuerte) pon('ocasion', t.replace(/^es\s+(un|una)\s+/i,'').replace(/^(para|por)\s+/i,'').trim(), true);
+      else if(/oficina/.test(n) && !ms.corpPidio) pon('ocasion', 'Pedido para la oficina');
+      var tf = /(lunes|martes|miercoles|jueves|viernes|sabado|domingo|manana|\b\d{1,2} de [a-z]+)/.exec(n);
+      var th = /(\d{1,2}(?::\d{2})?\s*(?:a\.? ?m\.?|p\.? ?m\.?|h\b|horas)|a las? \d{1,2}(?::\d{2})?\s*(?:a\.? ?m\.?|p\.? ?m\.?)?)/.exec(n);
+      if(tf){
+        var mf = /(?:el\s+|para\s+el\s+)?((?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)[^,]*?(?:\s\d{1,2}(?:\s+de\s+[a-z]+)?)?|manana|\d{1,2} de [a-z]+)(?=,|$|\s+a\s+la)/i.exec(t);
+        pon('fecha', (mf ? mf[1] : t).replace(/^(para\s+)?el\s+/i,''));
+      }
+      if(th) pon('hora', th[1].replace(/^a\s+las?\s+/i,''));
+      if(/^en\s|av\.|jr\.|calle|\bmz\b|direccion|ubicacion:/.test(n) && !fuerte) pon('lugar', t.replace(/^en\s+/i,''));
+      if(/factura|boleta|\bruc\b/.test(n)) pon('factura', /\bno\b|sin factura|boleta/.test(n) ? 'No requiere factura' : 'Sí, con factura');
+      if(/s\/\s?\d|\d+\s*soles|presupuesto|\d+\s*lucas/.test(n)) pon('presupuesto', t);
+      if(/^soy |me llamo|mi nombre|de la empresa/.test(n)) pon('contacto', t.replace(/^(soy|me llamo)\s+/i,''));
+      if(!hallo && ms.corpPidio && !c[ms.corpPidio] && t.trim().length > 1) pon(ms.corpPidio, t);
+
+      var falta = ORDEN_CORP.filter(function(k){ return !c[k]; })[0];
+      if(!ms.corpPidio && !hallo && saludo) return '¡Hola! Cuéntame qué necesitas para tu empresa: almuerzo, reunión o evento.';
+      if(falta){ var eraMismo = ms.corpPidio === falta; ms.corpPidio = falta; return (hallo && eraMismo ? 'Anotado. ' : '') + PREG_CORP[falta]; }
+      ms.cerrado = true; ms.corpPidio = '';
+      if(!silencioso){
+        var emp = c.contacto, con = c.contacto;
+        var pm = /^(.*?)\s*,?\s+(?:de la empresa|de|en|del)\s+(.+)$/i.exec(c.contacto);
+        if(pm){ con = pm[1].trim(); emp = pm[2].trim(); }
+        guardaMock(K_MOCK_C, { id:'CORP-' + (200 + Math.floor(Math.random()*700)), creado:new Date().toISOString(), contacto:con, empresa_lugar:emp + ' / ' + c.lugar,
+          ocasion_personas:c.ocasion + ' (' + c.personas + ' personas)', estado:'nuevo',
+          calificacion:{ empresa:emp, ocasion:c.ocasion, personas:c.personas, fecha:c.fecha, hora:c.hora, lugar:c.lugar, factura:c.factura, presupuesto:c.presupuesto } });
+      }
+      return 'Gracias. Tu solicitud quedó anotada. Una persona de Taikiri Burger te escribe para armar la propuesta.';
+    }
+
+    /* ----- pedido a pie ----- */
+    if(ms.cerrado) return 'Tu pedido ya quedó anotado. Si quieres otro, abre un pedido nuevo.';
+    var esPreg = /\?|^(hola\s+)?(tienes|tienen|hay|cuanto|cuesta|que )/.test(n);
+    var pago = /pague|yapee|ya pague|comprobante|ya hice el yape|hice el yape/.test(n);
+    var efectivo = /efectivo|contra ?entrega|al recibir/.test(n);
+    var elige = efectivo ? 'Efectivo' : ((/\byape\b/.test(n) && !pago) ? 'Yape' : '');
+
+    /* Cierra el pedido y deja la fila para el panel mock: Yape queda "por validar"; efectivo, "por cobrar al entregar". */
+    function cierra(metodo){
+      ms.cerrado = true; ms.pago = metodo;
+      if(!silencioso){
+        guardaMock(K_MOCK, { id:idPedido(), creado:new Date().toISOString(),
+          estado: metodo === 'Yape' ? 'por_validar' : 'por_cobrar', tipo: /^recojo/i.test(ms.entrega) ? 'recojo' : 'delivery',
+          pago:{ metodo:metodo, pagado_en:null }, cliente: ms.nombre, direccion: ms.entrega + (ms.ubic ? ' (ubicación enviada)' : ''),
+          items: ms.items.map(function(it){ return lineaItem(it).txt; }),
+          notas: (ms.notas && !/^ninguna/i.test(ms.notas)) ? ms.notas : '', total: totalMs(ms) });
+      }
+      return metodo === 'Yape'
+        ? 'Gracias, pago recibido. Tu pedido quedó anotado y lo estamos pasando a cocina. Te avisamos cuando esté listo.'
+        : 'Pagas en efectivo al recibir tu pedido. Tu pedido quedó anotado y lo estamos pasando a cocina. Te avisamos cuando esté listo.';
+    }
+    if(ms.cuenta && efectivo && !pago) return cierra('Efectivo al recibir');
+    if(ms.cuenta && pago) return cierra('Yape');
+
+    var nuevos = (esPreg && !/quiero|dame|anota|ponme|me das/.test(n)) ? [] : parseaItems(t);
+    if(esPreg && !nuevos.length){
+      var consulta = parseaItems(t)[0];
+      if(consulta && consulta.d !== undefined && /tienes|tienen|hay|cuanto|cuesta|precio/.test(n)){
+        return 'Sí, tenemos ' + consulta.n + ' a ' + soles(consulta.p) + (consulta.d ? ': ' + consulta.d : '') + '. ¿La anoto en tu pedido? Cuéntame qué más quieres.';
+      }
+      if(/horario|abren|cierran|atienden|hora/.test(n)){
+        return 'El horario es de martes a domingo, de 6:00 pm a 12:00 am. Tu pedido queda anotado y la casa lo confirma.';
+      }
+    }
+    nuevos.forEach(function(x){ ms.items.push(x); });
+    /* salsas de alitas pendientes */
+    var ref = ms.items.filter(function(it){ return it.nsal && it.salsas.length < it.nsal; })[0];
+    if(ref){
+      var dichas = SALSAS.filter(function(s){ return n.indexOf(s[0]) >= 0; }).map(function(s){ return s[1]; });
+      if(dichas.length && !nuevos.some(function(x){ return x === ref; })){
+        dichas.forEach(function(d){ if(ref.salsas.length < ref.nsal && ref.salsas.indexOf(d) < 0) ref.salsas.push(d); });
+        ref = ms.items.filter(function(it){ return it.nsal && it.salsas.length < it.nsal; })[0];
+      }
+      if(ref){
+        var quedan = ref.nsal - ref.salsas.length;
+        return 'Para tus ' + ref.n.toLowerCase() + ' puedes elegir ' + quedan + (quedan === 1 ? ' salsa' : ' salsas')
+          + ': Acevichada, BBQ, Maracuyá o Búfalo. ¿Cuál prefieres?';
+      }
+    }
+    if(!ms.items.length){
+      return saludo
+        ? (st.esc === 'b' ? 'Hola, Rosa Elena. ¿Qué se te antoja hoy?' : '¡Hola! Bienvenido(a) a Taikiri Burger. Cuéntame qué se te antoja y te tomo el pedido.')
+        : 'No encuentro eso en la carta. ¿Me dices el nombre del plato como aparece en la carta?';
+    }
+    var ack = '';
+    var dioCremas = /crema/.test(n);
+    if(dioCremas){ ms.notas = (ms.notas ? ms.notas + '. ' : '') + 'Con cremas'; ms.preguntoNotas = true; ack = 'Anotado: con cremas. '; }
+    var dioRecojo = /recojo|recoger|paso a recoger/.test(n);
+    if(dioRecojo){ ms.entrega = 'Recojo en tienda'; ack += 'Perfecto, recojo en tienda. '; }
+    var dioUbic = /ubicacion:\s*https?:/.test(n);
+    if(dioUbic){
+      var um = /(https?:\/\/\S+)/.exec(t); ms.ubic = um ? um[1] : ''; if(!ms.entrega) ms.entrega = 'Delivery';
+      ack += 'Recibí tu ubicación. ';
+    }
+    var dir = /(delivery|domicilio|a mi casa|envio)[,:]?\s*(.*)/i.exec(t);
+    if(dir && !dioRecojo){
+      if(!ms.entrega || ms.entrega === 'Delivery') ms.entrega = (dir[2] && dir[2].length > 4) ? dir[2].trim() : 'Delivery';
+      if(dir[2] && dir[2].length > 4) ack += 'Anotada tu dirección. ';
+    }
+    var otros = dioCremas || dioRecojo || dioUbic || !!dir || !!elige;
+    if(elige && !ms.pagoPref) ms.pagoPref = elige;
+
+    /* qué falta, en orden: uno por mensaje */
+    var yaPedi = ms.fase;
+    if(!ms.nombre){
+      if(yaPedi === 'nombre' && !nuevos.length && !pago && !esPreg && !otros){
+        ms.nombre = t.replace(/^(soy|me llamo|a nombre de|mi nombre es)\s+/i,'').trim();
+      }else if(st.esc === 'b'){ ms.nombre = ESC.b.cliente; }
+    }
+    if(!ms.nombre){
+      ms.fase = 'nombre';
+      return (nuevos.length ? 'Anotado: ' + ms.items.map(function(it){ return lineaItem(it).txt; }).join(', ') + '. ' : ack)
+        + '¿A nombre de quién va el pedido?';
+    }
+    if(!ms.entrega){
+      if(yaPedi === 'entrega' && t.trim().length > 3 && !nuevos.length && !otros){
+        ms.entrega = (/^si\b|misma|siempre/.test(n) && st.esc === 'b') ? ESC.b.direccion : t.trim();
+      }
+    }
+    if(!ms.entrega){
+      ms.fase = 'entrega';
+      if(st.esc === 'b') return ack + 'Rosa Elena, ¿el pedido va a la dirección de siempre, ' + ESC.b.direccion + '?';
+      return ack + (ack ? '' : 'Gracias, ' + ms.nombre.split(' ')[0] + '. ')
+        + '¿Es para recojo en tienda o delivery? Si es delivery, envíame tu dirección con una referencia (puedes mandar tu ubicación de WhatsApp).';
+    }
+    if(!ms.preguntoNotas){
+      ms.preguntoNotas = true; ms.fase = 'notas';
+      return ack + '¿Alguna indicación para tu pedido? Por ejemplo, sin lechuga o qué cremas quieres. Si no tienes ninguna, dime ninguna.';
+    }
+    if(ms.fase === 'notas' && !/crema/.test(n) && !ms.notas && !elige){ ms.notas = t.trim(); }
+    if(!ms.pagoPref){ ms.fase = 'pago'; return ack + '¿Pagas con Yape o en efectivo al recibir?'; }
+    if(ms.pagoPref === 'Efectivo') return resumenMs(ms) + '\n\n' + cierra('Efectivo al recibir');
+    if(!ms.cuenta){
+      ms.cuenta = true; ms.fase = 'cuenta';
+      return resumenMs(ms) + '\n\nPara pagar con Yape: ' + YAPE_NUM + ' (Taikiri Burger, número de demostración). '
+        + 'Cuando hayas pagado, escríbeme "ya pagué" o adjunta tu comprobante.';
+    }
+    return 'Cuando hayas pagado con Yape, escríbeme "ya pagué" o adjunta tu comprobante.';
+  }
+
+  function mockReplay(){
+    st.ms = msInicial();
+    st.msgs.forEach(function(m){ if(m.dir === 'in' && m.texto) mockTurno(m.texto, true); });
+  }
+
+  /* ---------------- conversación ---------------- */
+  function msgCasa(){
+    var t = new Date().toISOString();
+    st.msgs.push({ id:'auto-'+Date.now(), dir:'out', auto:true, texto: ESC[st.esc].saludo, ts:t });
+    st.msgs.push({ id:'carta-'+Date.now(), dir:'carta', auto:true, ts:t });
+  }
+  function abreHilo(){ st.msgs = []; st.ms = msInicial(); msgCasa(); pinta(true); }
+
+  function nuevaConversacion(cambiaEsc){
+    st.sesion = nuevaSesion();
+    st.tel = nuevoTelefono(st.esc);
+    st.enVuelo = false; st.esperando = false;
+    st.mock = MOCK_URL;
+    $('btn-enviar').disabled = false;
+    $('hd-estado').textContent = 'en línea';
+    abreHilo();
+    pintaSelector();
+    pintaRapidos();
+    $('in-sesion').value = st.sesion;
+    $('in-msg').value = ''; ajusta();
+    if(!cambiaEsc) $('in-msg').focus();
+  }
+
+  function pausa(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  /* ¿La respuesta cierra el pedido? Se evalúa por frase y se descartan las condicionales. */
+  var RE_FIN = /(pago (ya )?(fue |ha sido )?(recibido|confirmado|verificado|acreditado)|(recibimos|confirmamos|verificamos|hemos recibido) (tu|su) pago|ya est[aá] en cocina|pasa a cocina|queda anotado|qued[oó] anotad[ao]|solicitud qued[oó] anotada)/;
+  var RE_FIN_NO = /\b(cuando|apenas|una vez|en cuanto|hasta que|si|no|pendiente|esperando|falta|antes de)\b/;
+  function cierraPedido(texto){
+    var t = norm(texto);
+    return t.split(/[.!?\n]+/).some(function(f){ return RE_FIN.test(f) && !RE_FIN_NO.test(f); });
+  }
+
+  /* opts: { bubble:{tipo,...} } muestra una burbuja especial en lugar del texto. */
+  function enviar(texto, opts){
+    texto = String(texto||'').trim();
+    if(!texto || st.enVuelo) return;
+    opts = opts || {};
+
+    var sesion = st.sesion;
+    var mio = { id:'local-'+Date.now(), dir:'in', texto:texto, ts:new Date().toISOString(), leido:false };
+    if(opts.bubble){ for(var k in opts.bubble) mio[k] = opts.bubble[k]; }
+    st.msgs.push(mio);
+    st.enVuelo = true; st.esperando = true;
+    $('btn-enviar').disabled = true;
+    $('hd-estado').textContent = 'escribiendo…';
+    pinta();
+
+    var usaMock = st.mock;
+    if(usaMock && !st.ms) mockReplay();
+    var pAgente;
+    if(usaMock){
+      pAgente = pausa(700 + Math.floor(Math.random()*500)).then(function(){
+        if(st.sesion !== sesion) return null;
+        var yaCerrado = st.ms.cerrado;
+        var r = mockTurno(texto, false);
+        return { r:{ output:r }, local:true, yaCerrado:yaCerrado };
+      });
+    }else{
+      pAgente = postConReintento(EP_CHAT, { message: texto, sessionId: sesion, channel: 'web', telefono: st.tel })
+        .then(function(r){ return { r:r }; }, function(e){ return { e:e }; });
+    }
+
+    pAgente.then(function(a){
+      if(st.sesion !== sesion) return;
+      mio.leido = true;
+      if(!a) return;
+      if(a.e){ st.msgs.push({ id:'s-'+Date.now(), dir:'sis', texto: mensajeError(a.e), mockBtn: puedeMock(a.e) }); return; }
+      var reply = a.r && (a.r.output || a.r.response || a.r.text);
+      if(reply && String(reply).trim()){
+        reply = String(reply);
+        st.msgs.push({ id:'r-'+Date.now(), dir:'out', texto:reply, ts:new Date().toISOString() });
+        /* Un pedido por conversación: al cerrarse se ofrece uno nuevo */
+        if(cierraPedido(reply) && !st.msgs.some(function(m){ return m.dir === 'fin'; })){
+          st.msgs.push({ id:'fin-'+Date.now(), dir:'fin', corp: st.esc === 'c' });
+        }
+      }else{
+        st.msgs.push({ id:'s-'+Date.now(), dir:'sis', texto:'El agente respondió vacío. Vuelve a escribirle en unos segundos.' });
+      }
+    }).then(function(){
+      if(st.sesion !== sesion) return;
+      st.enVuelo = false; st.esperando = false;
+      $('btn-enviar').disabled = false;
+      $('hd-estado').textContent = 'en línea';
+      pinta(); pintaRapidos();
+    });
+  }
+
+  function puedeMock(e){ return !(e && e.status === 429); }
+  function mensajeError(e){
+    if(e && e.status === 429) return 'Estás enviando mensajes muy rápido. Espera un minuto y vuelve a intentarlo.';
+    if(e && e.status === 404) return 'El agente todavía no está conectado en este servidor. Puedes seguir con el guion de ejemplo.';
+    if(e && e.name === 'AbortError') return 'El agente está tardando más de lo normal. Puedes volver a intentarlo o seguir con el guion de ejemplo.';
+    if(e && e.status) return 'El agente no pudo responder ahora mismo (error ' + e.status + '). Puedes volver a intentarlo o seguir con el guion de ejemplo.';
+    return 'No hay conexión con el agente. Puedes volver a intentarlo o seguir con el guion de ejemplo.';
+  }
+
+  /* ---------------- acciones del cliente ---------------- */
+  function ultimoTotal(){
+    for(var i = st.msgs.length - 1; i >= 0; i--){
+      var m = st.msgs[i];
+      if(m.dir === 'out' && m.texto){
+        var r = /total[^\d]{0,12}S\/\s?([\d]+(?:[.,]\d{1,2})?)/i.exec(m.texto);
+        if(r) return parseFloat(r[1].replace(',','.'));
+      }
+    }
+    return null;
+  }
+  function enviaUbicacion(){
+    if(st.enVuelo) return;
+    enviar('Ubicación: ' + UBICACION, { bubble:{ tipo:'ubic', url:UBICACION } });
+  }
+  function enviaYape(){
+    if(st.enVuelo) return;
+    enviar('ya pagué', { bubble:{ tipo:'yape', monto:ultimoTotal() } });
+  }
+
+  /* ---------------- interfaz ---------------- */
+  function ajusta(){
+    var t = $('in-msg'); t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 100) + 'px';
+    t.style.overflowY = t.scrollHeight > 100 ? 'auto' : 'hidden';
+  }
+  function pintaSelector(){
+    ['a','b','c'].forEach(function(k){ $('seg-' + k).setAttribute('aria-pressed', st.esc === k); });
+    $('sel-info').innerHTML = esc(ESC[st.esc].info) + '<span class="mono">' + esc(telBonito(st.tel)) + '</span>'
+      + (st.mock ? ' &middot; guion de ejemplo (sin IA)' : '');
+  }
+  var ICO_PIN_BTN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0114 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/></svg>';
+  var ICO_REC_BTN = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>';
+  /* Última respuesta del agente (no la casa): de ella dependen los chips y el resalte del botón de Yape. */
+  function ultimaRespuesta(){
+    for(var i = st.msgs.length - 1; i >= 0; i--){ var m = st.msgs[i]; if(m.dir === 'out' && !m.auto && m.texto) return norm(m.texto); }
+    return '';
+  }
+  /* Chips SOLO de la pregunta que tiene abierta el agente (nunca de dos a la vez); gana la que aparece
+     más abajo en su texto. Antes de su primera respuesta: el primer mensaje del escenario. */
+  var REG_AB = [
+    [/yape o en efectivo/g, ['Yape', 'En efectivo al recibir']],
+    [/helado/g, ['No, sin helado', 'Sí, con helado (S/ 7 más)']],
+    [/direccion de siempre|misma direccion|direccion registrada/g, ['Sí, la misma dirección de siempre', 'Es para recojo en tienda']],
+    [/reco[gj]\w*(?: en tienda)? o |como recibes|con delivery/g, ['Recojo en tienda', 'Delivery: Jr. Los Pinos 345, Collique. Ref: frente a la bodega']],
+    [/indicaci|cremas/g, ['Ninguna', 'Con cremas, por favor', 'Sin lechuga']],
+    [/con que salsa|que salsa|cual salsa/g, ['BBQ', 'Acevichada', 'Maracuyá', 'Búfalo']],
+    [/a nombre de quien|nombre de la persona de contacto|con quien|como te llamas|tu nombre completo|tu nombre/g, 'NOMBRE'],
+    [/que se te antoja|que deseas pedir|que quieres pedir|que mas quieres|que mas deseas|la anoto/g, 'PEDIDO']
+  ];
+  var REG_C = [
+    [/a nombre de quien|nombre de la persona de contacto|con quien|como te llamas|tu nombre completo|tu nombre|nombre de tu empresa/g, ['Soy Marcos Rivera, de Inversiones Collique']],
+    [/ocasion|que necesitas/g, ['Es un pedido para mi oficina, somos 25 personas', 'Es un almuerzo de integración']],
+    [/cuantas personas|numero de personas/g, ['Somos 25 personas']],
+    [/fecha|para cuando|que dia/g, ['Para el viernes 23']],
+    [/\bhora\b/g, ['A la 1:00 pm']],
+    [/donde|direccion|lugar/g, ['En nuestra oficina, en Collique']],
+    [/factura/g, ['Sí, necesitamos factura']],
+    [/presupuesto/g, ['Unos S/ 600, más o menos']]
+  ];
+  function chipsCtx(){
+    var t = ultimaRespuesta(), e = ESC[st.esc];
+    if(!t) return e.inicio;
+    if(/999 ?999 ?999|pagas en efectivo al recibir tu pedido|pago recibido|solicitud quedo anotada/.test(t)) return [];   /* solo falta pagar o ya cerró */
+    var mejor = null, pos = -1;
+    (st.esc === 'c' ? REG_C : REG_AB).forEach(function(r){
+      var m, ult = -1; r[0].lastIndex = 0;
+      while((m = r[0].exec(t))) ult = m.index;
+      if(ult > pos){ pos = ult; mejor = r[1]; }
+    });
+    if(mejor === 'PEDIDO') return e.pedido;
+    if(mejor === 'NOMBRE'){
+      var nom = e.cliente || 'Carlos Mendoza';   /* si ya lo dio, no se vuelve a ofrecer */
+      return st.msgs.some(function(m){ return m.dir === 'in' && m.texto === nom; }) ? [] : [nom];
+    }
+    return mejor || [];
+  }
+  function pintaRapidos(){
+    var lista = chipsCtx();
+    var caja = $('rapidos-d');
+    caja.innerHTML = '';
+    var mov = $('rapidos-m'); mov.innerHTML = '';
+    function chip(txt, cont){
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'rapido'; b.textContent = txt;
+      b.addEventListener('click', function(){ $('in-msg').value = txt; $('in-msg').focus(); ajusta(); });
+      cont.appendChild(b);
+    }
+    lista.forEach(function(txt){ chip(txt, caja); });
+    /* móvil: las dos acciones van primero en la tira, luego los mensajes sugeridos */
+    var b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'accion'; b1.setAttribute('data-acc','ubic');
+    b1.innerHTML = ICO_PIN_BTN + 'Enviar ubicación';
+    var b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'accion'; b2.setAttribute('data-acc','yape');
+    b2.innerHTML = ICO_REC_BTN + 'Adjuntar comprobante de Yape';
+    var ctx = chipsCtx(), ctxChips = !!(ctx && ctx.length);
+    if(ctxChips) lista.forEach(function(txt){ chip(txt, mov); });   /* las contextuales van primero: son lo que toca responder */
+    mov.appendChild(b1); mov.appendChild(b2);
+    if(!ctxChips) lista.forEach(function(txt){ chip(txt, mov); });
+    /* con los datos del Yape a la vista, el siguiente paso es adjuntar el comprobante */
+    var dioDatos = /999 ?999 ?999/.test(ultimaRespuesta()) && !st.msgs.some(function(m){ return m.dir === 'fin'; });
+    [].forEach.call(document.querySelectorAll('[data-acc="yape"]'), function(b){ b.classList.toggle('resalta', dioDatos); });
+    mov.scrollLeft = 0;
+  }
+
+  function cambiaEscenario(k){
+    if(st.esc === k) return;
+    st.esc = k; nuevaConversacion(true);
+    try{ history.replaceState(null, '', location.pathname + '?' + (function(){ var p = new URLSearchParams(location.search); p.set('escenario', k); return p.toString(); })()); }catch(e){}
+  }
+
+  function init(){
+    if(!st.msgs.length){ st.ms = st.ms || msInicial(); msgCasa(); }
+    if(st.mock && !st.ms) mockReplay();
+    $('in-sesion').value = st.sesion;
+    pintaSelector();
+    pintaRapidos();
+    pinta(st.msgs.length <= 2);
+
+    $('seg-a').addEventListener('click', function(){ cambiaEscenario('a'); });
+    $('seg-b').addEventListener('click', function(){ cambiaEscenario('b'); });
+    $('seg-c').addEventListener('click', function(){ cambiaEscenario('c'); });
+
+    $('hilo').addEventListener('click', function(ev){
+      var n = ev.target.closest && ev.target.closest('button[data-nuevo]');
+      if(n){ nuevaConversacion(true); return; }
+      var m = ev.target.closest && ev.target.closest('button[data-mock]');
+      if(m){
+        st.mock = true; mockReplay();
+        st.msgs = st.msgs.filter(function(x){ return !x.mockBtn; });
+        var ult = null;
+        for(var i = st.msgs.length - 1; i >= 0; i--) if(st.msgs[i].dir === 'in'){ ult = st.msgs[i]; break; }
+        st.msgs.push({ id:'s-'+Date.now(), dir:'sis', texto:'Guion de ejemplo activo: las respuestas de aquí en adelante son locales, sin IA.' });
+        pintaSelector(); pinta();
+        if(ult){
+          /* reenvía el último mensaje por el guion local (sin duplicar la burbuja) */
+          st.msgs = st.msgs.filter(function(x){ return x !== ult; });
+          st.ms = msInicial();
+          st.msgs.forEach(function(x){ if(x.dir === 'in' && x.texto) mockTurno(x.texto, true); });
+          enviar(ult.texto, ult.tipo ? { bubble:{ tipo:ult.tipo, url:ult.url, monto:ult.monto } } : null);
+        }
+        return;
+      }
+      var b = ev.target.closest && ev.target.closest('button[data-carta]');
+      if(b) abreVisor(b.getAttribute('data-carta'));
+    });
+
+    document.addEventListener('click', function(ev){
+      var a = ev.target.closest && ev.target.closest('[data-acc]');
+      if(!a) return;
+      var acc = a.getAttribute('data-acc');
+      if(acc === 'ubic') enviaUbicacion();
+      else if(acc === 'yape') enviaYape();
+    });
+
+    $('form').addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var t = $('in-msg').value;
+      $('in-msg').value = ''; ajusta();
+      enviar(t);
+    });
+    $('in-msg').addEventListener('input', ajusta);
+    $('in-msg').addEventListener('keydown', function(ev){
+      if(ev.key === 'Enter' && !ev.shiftKey){ ev.preventDefault(); $('form').requestSubmit(); }
+    });
+    $('btn-nueva').addEventListener('click', function(){ nuevaConversacion(false); });
+
+    var reloj = function(){ $('st-hora').textContent = hora(new Date()); };
+    reloj();
+    var timer = setInterval(reloj, 20000);
+    window.addEventListener('pagehide', function(){ clearInterval(timer); });
+  }
+
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
